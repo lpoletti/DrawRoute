@@ -26,6 +26,7 @@ RouteManager.prototype.initMap = function() {
     this.directionsRenderer.setMap(this.map);
     this.geocoder = new google.maps.Geocoder();
 
+    document.getElementById('useCurrentLocation').onchange = function(e) { self.handleLocationToggle(e); };
     document.getElementById('addWaypoint').onclick = function() { self.addWaypoint(); };
     document.getElementById('calculateRoute').onclick = function() { self.calculateRoute(); };
     document.getElementById('clearRoute').onclick = function() { self.clearRoute(); };
@@ -35,9 +36,94 @@ RouteManager.prototype.initMap = function() {
     document.getElementById('exportJSON').onclick = function() { self.exportJSON(); };
 
     this.map.addListener('click', function(e) { self.handleMapClick(e); });
+    
     this.setupAutocomplete('origin');
     this.setupAutocomplete('destination');
+    this.setupNoteListener('origin');
+    this.setupNoteListener('destination');
     this.loadFavorites();
+};
+
+RouteManager.prototype.handleLocationToggle = function(event) {
+    if (event.target.checked) {
+        this.getCurrentLocation();
+    } else {
+        document.getElementById('origin').value = '';
+        document.getElementById('origin').disabled = false;
+        this.removeMarkerById('origin');
+    }
+};
+
+RouteManager.prototype.getCurrentLocation = function() {
+    var self = this;
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                var pos = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                
+                self.map.setCenter(pos);
+                self.map.setZoom(15);
+                
+                self.geocoder.geocode({ location: pos }, function(results, status) {
+                    if (status === 'OK' && results[0]) {
+                        var address = results[0].formatted_address;
+                        document.getElementById('origin').value = address;
+                        document.getElementById('origin').disabled = true;
+                        self.addMarker('origin', new google.maps.LatLng(pos.lat, pos.lng), address);
+                    }
+                });
+            },
+            function() {
+                alert('Erro ao obter localização. Verifique as permissões do navegador.');
+            }
+        );
+    } else {
+        alert('Geolocalização não suportada pelo seu navegador.');
+    }
+};
+
+RouteManager.prototype.removeMarkerById = function(fieldId) {
+    for (var i = 0; i < this.markers.length; i++) {
+        if (this.markers[i].id === fieldId) {
+            this.markers[i].marker.setMap(null);
+            this.markers.splice(i, 1);
+            break;
+        }
+    }
+};
+
+RouteManager.prototype.setupNoteListener = function(fieldId) {
+    var self = this;
+    var noteDiv = document.getElementById('note-' + fieldId);
+    if (!noteDiv) return;
+    
+    var textarea = noteDiv.querySelector('textarea');
+    var charCount = noteDiv.querySelector('.char-count');
+    
+    if (textarea && charCount) {
+        textarea.oninput = function() {
+            charCount.textContent = textarea.value.length + '/500';
+            self.notes[fieldId] = textarea.value;
+            
+            // Atualizar botão de nota visualmente
+            var noteButton = document.querySelector('[onclick*="toggleNote(\'' + fieldId + '\')"]');
+            if (noteButton) {
+                if (textarea.value.trim()) {
+                    noteButton.classList.add('active');
+                } else {
+                    noteButton.classList.remove('active');
+                }
+            }
+        };
+        
+        // Capturar nota existente ao carregar
+        if (textarea.value) {
+            self.notes[fieldId] = textarea.value;
+        }
+    }
 };
 
 RouteManager.prototype.setupAutocomplete = function(inputId) {
@@ -132,7 +218,7 @@ RouteManager.prototype.handleMapClick = function(event) {
 
 RouteManager.prototype.addToNextField = function(address, latLng) {
     var origin = document.getElementById('origin');
-    if (!origin.value) {
+    if (!origin.value && !origin.disabled) {
         origin.value = address;
         this.addMarker('origin', latLng, address);
         return;
@@ -196,11 +282,21 @@ RouteManager.prototype.addWaypoint = function() {
         }
     };
 
+    // CORREÇÃO AQUI - Capturar notas do waypoint
     var textarea = div.querySelector('textarea');
     var charCount = div.querySelector('.char-count');
+    var noteButton = div.querySelector('.btn-note');
+    
     textarea.oninput = function() {
         charCount.textContent = textarea.value.length + '/500';
         self.notes[fieldId] = textarea.value;
+        
+        // Atualizar visual do botão
+        if (textarea.value.trim()) {
+            noteButton.classList.add('active');
+        } else {
+            noteButton.classList.remove('active');
+        }
     };
 };
 
@@ -246,6 +342,7 @@ RouteManager.prototype.calculateRoute = function() {
     }
 
     var self = this;
+    console.log('Calculating route from', origin, 'to', dest, 'via', waypoints);
     this.directionsService.route({
         origin: origin,
         destination: dest,
@@ -271,6 +368,24 @@ RouteManager.prototype.processRoute = function(result, origin, dest, waypoints) 
         totalTime += route.legs[i].duration.value;
     }
 
+    var originNote = document.querySelector('#note-origin textarea');
+    if (originNote && originNote.value) {
+        this.notes['origin'] = originNote.value;
+    }
+    
+    var destNote = document.querySelector('#note-destination textarea');
+    if (destNote && destNote.value) {
+        this.notes['destination'] = destNote.value;
+    }
+    
+    var waypointTextareas = document.querySelectorAll('#waypoints-list .waypoint-note textarea');
+    for (var w = 0; w < waypointTextareas.length; w++) {
+        var fieldId = waypointTextareas[w].closest('.waypoint-note').id.replace('note-', '');
+        if (waypointTextareas[w].value) {
+            this.notes[fieldId] = waypointTextareas[w].value;
+        }
+    }
+    
     this.currentRouteData = {
         origin: {
             address: origin,
@@ -278,6 +393,7 @@ RouteManager.prototype.processRoute = function(result, origin, dest, waypoints) 
                 lat: route.legs[0].start_location.lat(),
                 lng: route.legs[0].start_location.lng()
             },
+            note: this.notes['origin'] || ''
         },
         waypoints: [],
         destination: {
@@ -286,6 +402,7 @@ RouteManager.prototype.processRoute = function(result, origin, dest, waypoints) 
                 lat: route.legs[route.legs.length - 1].end_location.lat(),
                 lng: route.legs[route.legs.length - 1].end_location.lng()
             },
+            note: this.notes['destination'] || ''
         },
         summary: {
             distanceText: (totalDist / 1000).toFixed(1) + ' km',
@@ -302,9 +419,12 @@ RouteManager.prototype.processRoute = function(result, origin, dest, waypoints) 
                     lat: route.legs[j].end_location.lat(),
                     lng: route.legs[j].end_location.lng()
                 },
+                note: this.notes[fieldId] || ''
             });
         }
     }
+
+    console.log(this.currentRouteData);
 
     document.getElementById('totalDistance').textContent = this.currentRouteData.summary.distanceText;
     document.getElementById('totalDuration').textContent = this.currentRouteData.summary.durationText;
@@ -346,6 +466,8 @@ RouteManager.prototype.copyLink = function() {
     if (url) {
         navigator.clipboard.writeText(url).then(function() {
             alert('Link copiado!');
+        }).catch(function() {
+            alert('Erro ao copiar link');
         });
     } else {
         alert('Calcule uma rota primeiro');
@@ -358,15 +480,16 @@ RouteManager.prototype.exportJSON = function() {
         return;
     }
 
-    var data = JSON.stringify({
+    var exportData = {
         origin: this.currentRouteData.origin,
         waypoints: this.currentRouteData.waypoints,
         destination: this.currentRouteData.destination,
         summary: this.currentRouteData.summary,
         googleMapsUrl: this.generateURL(),
         exportedAt: new Date().toISOString()
-    }, null, 2);
+    };
 
+    var data = JSON.stringify(exportData, null, 2);
     var blob = new Blob([data], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -380,6 +503,8 @@ RouteManager.prototype.exportJSON = function() {
 RouteManager.prototype.clearRoute = function() {
     document.getElementById('origin').value = '';
     document.getElementById('destination').value = '';
+    document.getElementById('origin').disabled = false;
+    document.getElementById('useCurrentLocation').checked = false;
     document.getElementById('waypoints-list').innerHTML = '';
     
     for (var i = 0; i < this.markers.length; i++) {
@@ -387,10 +512,28 @@ RouteManager.prototype.clearRoute = function() {
     }
     this.markers = [];
     
-    this.directionsRenderer.setDirections({ routes: [] });
+    // CORREÇÃO: Limpar o DirectionsRenderer corretamente
+    this.directionsRenderer.set('directions', null);
+    
     document.getElementById('routeInfo').style.display = 'none';
     this.currentRouteData = null;
     this.notes = {};
+    
+    // Limpar textareas de notas
+    var textareas = document.querySelectorAll('.waypoint-note textarea');
+    for (var j = 0; j < textareas.length; j++) {
+        textareas[j].value = '';
+    }
+    
+    var noteDivs = document.querySelectorAll('.waypoint-note');
+    for (var k = 0; k < noteDivs.length; k++) {
+        noteDivs[k].style.display = 'none';
+    }
+    
+    var noteButtons = document.querySelectorAll('.btn-note');
+    for (var m = 0; m < noteButtons.length; m++) {
+        noteButtons[m].classList.remove('active');
+    }
 };
 
 RouteManager.prototype.saveRoute = function() {
@@ -412,29 +555,34 @@ RouteManager.prototype.saveRoute = function() {
         savedAt: new Date().toLocaleString()
     };
 
-    favorites.push(saved);
-    localStorage.setItem('favoriteRoutes', JSON.stringify(favorites));
+    var storedFavorites = localStorage.getItem('favoriteRoutes');
+    var favoritesList = storedFavorites ? JSON.parse(storedFavorites) : [];
+    favoritesList.push(saved);
+    localStorage.setItem('favoriteRoutes', JSON.stringify(favoritesList));
     
     this.loadFavorites();
-    alert('Rota salva!');
+    alert('Rota salva com sucesso!');
 };
 
 RouteManager.prototype.loadFavorites = function() {
+    var storedFavorites = localStorage.getItem('favoriteRoutes');
+    var favoritesList = storedFavorites ? JSON.parse(storedFavorites) : [];
+    
     var list = document.getElementById('favoritesList');
     list.innerHTML = '';
     
-    if (favorites.length === 0) {
+    if (favoritesList.length === 0) {
         list.innerHTML = '<p style="text-align:center;color:#999;padding:1rem">Nenhuma rota salva</p>';
         return;
     }
     
-    for (var i = 0; i < favorites.length; i++) {
-        var r = favorites[i];
+    for (var i = 0; i < favoritesList.length; i++) {
+        var r = favoritesList[i];
         var div = document.createElement('div');
         div.className = 'favorite-item';
         div.innerHTML = 
             '<div class="favorite-header">' +
-            '<div class="favorite-name">' + r.name + '</div>' +
+            '<div class="favorite-name">' + this.escapeHtml(r.name) + '</div>' +
             '<div class="favorite-date">' + r.savedAt + '</div>' +
             '</div>' +
             '<div class="favorite-actions">' +
@@ -447,10 +595,19 @@ RouteManager.prototype.loadFavorites = function() {
     }
 };
 
+RouteManager.prototype.escapeHtml = function(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+};
+
 RouteManager.prototype.openSaved = function(id) {
-    for (var i = 0; i < favorites.length; i++) {
-        if (favorites[i].id === id) {
-            var url = this.generateURL(favorites[i]);
+    var storedFavorites = localStorage.getItem('favoriteRoutes');
+    var favoritesList = storedFavorites ? JSON.parse(storedFavorites) : [];
+    
+    for (var i = 0; i < favoritesList.length; i++) {
+        if (favoritesList[i].id === id) {
+            var url = this.generateURL(favoritesList[i]);
             if (url) window.open(url, '_blank');
             return;
         }
@@ -458,10 +615,13 @@ RouteManager.prototype.openSaved = function(id) {
 };
 
 RouteManager.prototype.showDetails = function(id) {
+    var storedFavorites = localStorage.getItem('favoriteRoutes');
+    var favoritesList = storedFavorites ? JSON.parse(storedFavorites) : [];
+    
     var route = null;
-    for (var i = 0; i < favorites.length; i++) {
-        if (favorites[i].id === id) {
-            route = favorites[i];
+    for (var i = 0; i < favoritesList.length; i++) {
+        if (favoritesList[i].id === id) {
+            route = favoritesList[i];
             break;
         }
     }
@@ -469,22 +629,22 @@ RouteManager.prototype.showDetails = function(id) {
 
     var html = '<div class="route-point origin">' +
         '<div class="route-point-header"><div class="route-point-icon origin">A</div><span class="route-point-title">Origem</span></div>' +
-        '<div class="route-point-address">' + route.origin.address + '</div>' +
-        (route.origin.note ? '<div class="route-point-note">' + route.origin.note + '</div>' : '') +
+        '<div class="route-point-address">' + this.escapeHtml(route.origin.address) + '</div>' +
+        (route.origin.note ? '<div class="route-point-note"><i class="fas fa-sticky-note"></i> ' + this.escapeHtml(route.origin.note) + '</div>' : '') +
         '</div>';
 
     for (var j = 0; j < route.waypoints.length; j++) {
         html += '<div class="route-point waypoint">' +
             '<div class="route-point-header"><div class="route-point-icon waypoint">' + (j + 1) + '</div><span class="route-point-title">Parada ' + (j + 1) + '</span></div>' +
-            '<div class="route-point-address">' + route.waypoints[j].address + '</div>' +
-            (route.waypoints[j].note ? '<div class="route-point-note">' + route.waypoints[j].note + '</div>' : '') +
+            '<div class="route-point-address">' + this.escapeHtml(route.waypoints[j].address) + '</div>' +
+            (route.waypoints[j].note ? '<div class="route-point-note"><i class="fas fa-sticky-note"></i> ' + this.escapeHtml(route.waypoints[j].note) + '</div>' : '') +
             '</div>';
     }
 
     html += '<div class="route-point destination">' +
         '<div class="route-point-header"><div class="route-point-icon destination">B</div><span class="route-point-title">Destino</span></div>' +
-        '<div class="route-point-address">' + route.destination.address + '</div>' +
-        (route.destination.note ? '<div class="route-point-note">' + route.destination.note + '</div>' : '') +
+        '<div class="route-point-address">' + this.escapeHtml(route.destination.address) + '</div>' +
+        (route.destination.note ? '<div class="route-point-note"><i class="fas fa-sticky-note"></i> ' + this.escapeHtml(route.destination.note) + '</div>' : '') +
         '</div>';
 
     html += '<div style="margin-top:1.5rem;padding:1rem;background:#e3f2fd;border-radius:8px">' +
@@ -509,10 +669,13 @@ RouteManager.prototype.closeRouteModal = function() {
 };
 
 RouteManager.prototype.loadRoute = function(id) {
+    var storedFavorites = localStorage.getItem('favoriteRoutes');
+    var favoritesList = storedFavorites ? JSON.parse(storedFavorites) : [];
+    
     var route = null;
-    for (var i = 0; i < favorites.length; i++) {
-        if (favorites[i].id === id) {
-            route = favorites[i];
+    for (var i = 0; i < favoritesList.length; i++) {
+        if (favoritesList[i].id === id) {
+            route = favoritesList[i];
             break;
         }
     }
@@ -522,6 +685,16 @@ RouteManager.prototype.loadRoute = function(id) {
 
     document.getElementById('origin').value = route.origin.address;
     this.addMarker('origin', new google.maps.LatLng(route.origin.coordinates.lat, route.origin.coordinates.lng), route.origin.address);
+
+    if (route.origin.note) {
+        this.notes['origin'] = route.origin.note;
+        var originTextarea = document.querySelector('#note-origin textarea');
+        if (originTextarea) {
+            originTextarea.value = route.origin.note;
+            var originCount = document.querySelector('#note-origin .char-count');
+            if (originCount) originCount.textContent = route.origin.note.length + '/500';
+        }
+    }
 
     var self = this;
     for (var j = 0; j < route.waypoints.length; j++) {
@@ -535,7 +708,11 @@ RouteManager.prototype.loadRoute = function(id) {
                     if (wp.note) {
                         self.notes[inputs[index].dataset.fieldId] = wp.note;
                         var textarea = document.querySelector('#note-' + inputs[index].dataset.fieldId + ' textarea');
-                        if (textarea) textarea.value = wp.note;
+                        if (textarea) {
+                            textarea.value = wp.note;
+                            var count = document.querySelector('#note-' + inputs[index].dataset.fieldId + ' .char-count');
+                            if (count) count.textContent = wp.note.length + '/500';
+                        }
                     }
                 }
             }, 150 * (index + 1));
@@ -546,6 +723,16 @@ RouteManager.prototype.loadRoute = function(id) {
         document.getElementById('destination').value = route.destination.address;
         self.addMarker('destination', new google.maps.LatLng(route.destination.coordinates.lat, route.destination.coordinates.lng), route.destination.address);
         
+        if (route.destination.note) {
+            self.notes['destination'] = route.destination.note;
+            var destTextarea = document.querySelector('#note-destination textarea');
+            if (destTextarea) {
+                destTextarea.value = route.destination.note;
+                var destCount = document.querySelector('#note-destination .char-count');
+                if (destCount) destCount.textContent = route.destination.note.length + '/500';
+            }
+        }
+        
         setTimeout(function() {
             self.calculateRoute();
         }, 500);
@@ -555,14 +742,18 @@ RouteManager.prototype.loadRoute = function(id) {
 RouteManager.prototype.deleteRoute = function(id) {
     if (!confirm('Excluir rota?')) return;
     
+    var storedFavorites = localStorage.getItem('favoriteRoutes');
+    var favoritesList = storedFavorites ? JSON.parse(storedFavorites) : [];
+    
     var filtered = [];
-    for (var i = 0; i < favorites.length; i++) {
-        if (favorites[i].id !== id) {
-            filtered.push(favorites[i]);
+    for (var i = 0; i < favoritesList.length; i++) {
+        if (favoritesList[i].id !== id) {
+            filtered.push(favoritesList[i]);
         }
     }
     localStorage.setItem('favoriteRoutes', JSON.stringify(filtered));
     this.loadFavorites();
+    alert('Rota excluída!');
 };
 
 function initMap() {
