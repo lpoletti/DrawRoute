@@ -1,0 +1,737 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    background: #fff;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1976d2;
+}
+
+.header i {
+    margin-right: 0.5rem;
+}
+
+.main-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 380px;
+    background: #fff;
+    border-right: 1px solid #e0e0e0;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.map-container {
+    flex: 1;
+    position: relative;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+}
+
+.map-instructions {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    z-index: 1000;
+}
+
+.location-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.3s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #1976d2;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+.waypoints-container {
+    margin-bottom: 1.5rem;
+}
+
+.waypoint-item {
+    margin-bottom: 0.75rem;
+    position: relative;
+}
+
+.waypoint-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.waypoint-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.origin-icon {
+    background-color: #4caf50;
+}
+
+.destination-icon {
+    background-color: #f44336;
+}
+
+.waypoint-icon.intermediate {
+    background-color: #ff9800;
+}
+
+.waypoint-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    transition: border-color 0.3s;
+}
+
+.waypoint-input:focus {
+    outline: none;
+    border-color: #1976d2;
+}
+
+.btn-note {
+    background: #fff;
+    border: 2px solid #e0e0e0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    transition: all 0.3s;
+}
+
+.btn-note:hover {
+    border-color: #1976d2;
+    color: #1976d2;
+}
+
+.btn-note.active {
+    background: #1976d2;
+    border-color: #1976d2;
+    color: white;
+}
+
+.waypoint-note {
+    margin-top: 0.5rem;
+    margin-left: 40px;
+    animation: slideDown 0.3s ease-out;
+}
+
+.waypoint-note textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 60px;
+}
+
+.waypoint-note textarea:focus {
+    outline: none;
+    border-color: #1976d2;
+}
+
+.char-count {
+    display: block;
+    text-align: right;
+    font-size: 0.7rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 200px;
+    }
+}
+
+.remove-waypoint {
+    background: #f44336;
+    color: white;
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+}
+
+.btn {
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+.btn-primary {
+    background: #1976d2;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #1565c0;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #218838;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+.btn-export {
+    background: #17a2b8;
+    color: white;
+    font-size: 0.8rem;
+    padding: 0.6rem 0.8rem;
+}
+
+.btn-export:hover {
+    background: #138496;
+}
+
+.route-actions {
+    margin-bottom: 1.5rem;
+}
+
+.route-info {
+    background: #e3f2fd;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.route-info h3 {
+    margin-bottom: 0.75rem;
+    color: #1976d2;
+    font-size: 1rem;
+}
+
+.route-info h4 {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    color: #1976d2;
+    font-size: 0.9rem;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.info-item i {
+    color: #1976d2;
+    width: 16px;
+}
+
+.export-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #bbdefb;
+}
+
+.favorites-section h3 {
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+    color: #333;
+}
+
+.favorite-item {
+    background: #f8f9fa;
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.favorite-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.favorite-name {
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.favorite-date {
+    font-size: 0.7rem;
+    color: #6c757d;
+}
+
+.favorite-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.favorite-btn {
+    background: none;
+    border: 1px solid #dee2e6;
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.3s;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex: 1;
+    justify-content: center;
+}
+
+.favorite-btn:hover {
+    background: #e9ecef;
+}
+
+.favorite-btn.load {
+    color: #1976d2;
+    border-color: #1976d2;
+}
+
+.favorite-btn.load:hover {
+    background: #e3f2fd;
+}
+
+.favorite-btn.google {
+    color: #4285f4;
+    border-color: #4285f4;
+}
+
+.favorite-btn.google:hover {
+    background: #e8f0fe;
+}
+
+.favorite-btn.info {
+    color: #17a2b8;
+    border-color: #17a2b8;
+}
+
+.favorite-btn.info:hover {
+    background: #d1ecf1;
+}
+
+.favorite-btn.delete {
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+.favorite-btn.delete:hover {
+    background: #f8d7da;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+    animation: fadeIn 0.3s;
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    animation: slideUp 0.3s;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    font-size: 1.25rem;
+    color: #1976d2;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6c757d;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.3s;
+}
+
+.modal-close:hover {
+    background: #f0f0f0;
+}
+
+.modal-body {
+    padding: 1.5rem;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.route-point {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #1976d2;
+}
+
+.route-point.origin {
+    border-left-color: #4caf50;
+}
+
+.route-point.destination {
+    border-left-color: #f44336;
+}
+
+.route-point.waypoint {
+    border-left-color: #ff9800;
+}
+
+.route-point-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.route-point-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: white;
+}
+
+.route-point-icon.origin {
+    background: #4caf50;
+}
+
+.route-point-icon.destination {
+    background: #f44336;
+}
+
+.route-point-icon.waypoint {
+    background: #ff9800;
+}
+
+.route-point-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.route-point-address {
+    font-size: 0.85rem;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.route-point-note {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-style: italic;
+    padding: 0.5rem;
+    background: white;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .main-content {
+        flex-direction: column;
+    }
+    
+    .sidebar {
+        width: 100%;
+        height: 350px;
+        border-right: none;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .header {
+        padding: 1rem;
+    }
+    
+    .header h1 {
+        font-size: 1.25rem;
+    }
+    
+    .map-instructions {
+        position: static;
+        margin: 0.5rem;
+        text-align: center;
+    }
+
+    .modal-content {
+        width: 95%;
+        margin: 10% auto;
+    }
+
+    .favorite-actions {
+        flex-direction: column;
+    }
+
+    .favorite-btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .sidebar {
+        padding: 1rem;
+        width: 100%;
+    }
+    
+    .waypoint-header {
+        gap: 0.5rem;
+    }
+    
+    .waypoint-icon {
+        width: 28px;
+        height: 28px;
+        font-size: 0.75rem;
+    }
+    
+    .btn {
+        padding: 0.625rem 0.75rem;
+        font-size: 0.8rem;
+    }
+}
+
+/* Animações */
+.waypoint-item {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.route-info {
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Toast notification */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #333;
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 10000;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.toast.success {
+    background: #28a745;
+}
+
+.toast.error {
+    background: #dc3545;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}

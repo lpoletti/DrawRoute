@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planejador de Rotas</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-route"></i> Planejador de Rotas</h1>
+        </header>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="route-controls">
+                    <div class="location-toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="useCurrentLocation">
+                            <span class="slider"></span>
+                        </label>
+                        <span>Usar localização atual</span>
+                    </div>
+
+                    <div class="waypoints-container">
+                        <div class="waypoint-item origin">
+                            <div class="waypoint-header">
+                                <div class="waypoint-icon origin-icon">A</div>
+                                <input type="text" class="waypoint-input" id="origin" placeholder="Ponto de origem">
+                                <button class="btn-note" onclick="routeManager.toggleNote('origin')" title="Adicionar observação">
+                                    <i class="fas fa-sticky-note"></i>
+                                </button>
+                            </div>
+                            <div class="waypoint-note" id="note-origin" style="display: none;">
+                                <textarea placeholder="Adicione uma observação..." maxlength="500"></textarea>
+                                <small class="char-count">0/500</small>
+                            </div>
+                        </div>
+
+                        <div id="waypoints-list"></div>
+
+                        <div class="waypoint-item destination">
+                            <div class="waypoint-header">
+                                <div class="waypoint-icon destination-icon">B</div>
+                                <input type="text" class="waypoint-input" id="destination" placeholder="Destino final">
+                                <button class="btn-note" onclick="routeManager.toggleNote('destination')" title="Adicionar observação">
+                                    <i class="fas fa-sticky-note"></i>
+                                </button>
+                            </div>
+                            <div class="waypoint-note" id="note-destination" style="display: none;">
+                                <textarea placeholder="Adicione uma observação..." maxlength="500"></textarea>
+                                <small class="char-count">0/500</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-secondary" id="addWaypoint">
+                        <i class="fas fa-plus"></i> Adicionar Parada
+                    </button>
+
+                    <div class="route-actions">
+                        <button class="btn btn-primary" id="calculateRoute">
+                            <i class="fas fa-route"></i> Calcular Rota
+                        </button>
+                        <button class="btn btn-danger" id="clearRoute">
+                            <i class="fas fa-trash"></i> Limpar
+                        </button>
+                    </div>
+
+                    <div class="route-info" id="routeInfo" style="display: none;">
+                        <h3>Informações da Rota</h3>
+                        <div class="info-item">
+                            <i class="fas fa-road"></i>
+                            <span>Distância: <span id="totalDistance">-</span></span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-clock"></i>
+                            <span>Tempo: <span id="totalDuration">-</span></span>
+                        </div>
+                        
+                        <div class="export-section">
+                            <h4>Exportar Rota</h4>
+                            <button class="btn btn-export" id="openInGoogleMaps">
+                                <i class="fab fa-google"></i> Abrir no Google Maps
+                            </button>
+                            <button class="btn btn-export" id="copyGoogleMapsLink">
+                                <i class="fas fa-link"></i> Copiar Link
+                            </button>
+                            <button class="btn btn-export" id="exportJSON">
+                                <i class="fas fa-file-code"></i> Exportar JSON
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="favorites-section">
+                        <h3>Rotas Favoritas</h3>
+                        <button class="btn btn-success" id="saveRoute">
+                            <i class="fas fa-heart"></i> Salvar Rota
+                        </button>
+                        <div id="favoritesList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="map-instructions">
+                    <p><i class="fas fa-info-circle"></i> Clique no mapa para adicionar pontos ou digite os endereços</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalhes da Rota -->
+    <div id="routeDetailsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalRouteName">Detalhes da Rota</h2>
+                <button class="modal-close" onclick="routeManager.closeRouteModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalRouteDetails">
+                <!-- Conteúdo será preenchido dinamicamente -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="modalOpenGoogleMaps">
+                    <i class="fab fa-google"></i> Abrir no Google Maps
+                </button>
+                <button class="btn btn-secondary" onclick="routeManager.closeRouteModal()">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script async defer 
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB0HWaR96SOjW2ujDgd5HbBHTr94m7gvNA&libraries=places&callback=initMap">
+    </script>
+</body>
+</html>
