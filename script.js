@@ -231,6 +231,7 @@ RouteManager.prototype.calculateRoute = function() {
     var origin = document.getElementById('origin').value;
     var dest = document.getElementById('destination').value;
     
+    if (!origin.trim() || !dest.trim()) {
         alert('Preencha origem e destino');
         return;
     }
