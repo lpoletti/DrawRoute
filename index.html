@@ -100,6 +100,21 @@
                         <button class="btn btn-success" id="saveRoute">
                             <i class="fas fa-heart"></i> Salvar Rota
                         </button>
+                        <div class="favorites-filters">
+                            <div class="filter-group">
+                                <input type="text" id="searchRoutes" class="filter-input" placeholder="🔍 Buscar rotas...">
+                            </div>
+                            <div class="filter-group">
+                                <select id="sortRoutes" class="filter-select">
+                                    <option value="date-desc">📅 Mais recentes</option>
+                                    <option value="date-asc">📅 Mais antigas</option>
+                                    <option value="name-asc">🔤 Nome (A-Z)</option>
+                                    <option value="name-desc">🔤 Nome (Z-A)</option>
+                                    <option value="distance-asc">📏 Menor distância</option>
+                                    <option value="distance-desc">📏 Maior distância</option>
+                                </select>
+                            </div>
+                        </div>
                         <div id="favoritesList"></div>
                     </div>
                 </div>
@@ -128,7 +143,10 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-primary" id="modalOpenGoogleMaps">
-                    <i class="fab fa-google"></i> Abrir no Google Maps
+                    <i class="fab fa-google"></i> Abrir Maps
+                </button>
+                <button id="modalShareWhatsApp" class="btn-success">
+                    <i class="fab fa-whatsapp"></i> Compartilhar
                 </button>
                 <button class="btn btn-secondary" onclick="routeManager.closeRouteModal()">
                     Fechar
@@ -136,6 +154,8 @@
             </div>
         </div>
     </div>
+
+    <div class="toast-container" id="toastContainer"></div>
 
     <script src="script.js"></script>
     <script async defer 

@@ -42,6 +42,7 @@ RouteManager.prototype.initMap = function() {
     this.setupNoteListener('origin');
     this.setupNoteListener('destination');
     this.loadFavorites();
+    this.initFilters();
 };
 
 RouteManager.prototype.handleLocationToggle = function(event) {
@@ -108,7 +109,9 @@ RouteManager.prototype.setupNoteListener = function(fieldId) {
             charCount.textContent = textarea.value.length + '/500';
             self.notes[fieldId] = textarea.value;
             
-            // Atualizar botão de nota visualmente
+            // Atualizar tooltip do marcador
+            self.updateMarkerTooltip(fieldId);
+            
             var noteButton = document.querySelector('[onclick*="toggleNote(\'' + fieldId + '\')"]');
             if (noteButton) {
                 if (textarea.value.trim()) {
@@ -119,7 +122,6 @@ RouteManager.prototype.setupNoteListener = function(fieldId) {
             }
         };
         
-        // Capturar nota existente ao carregar
         if (textarea.value) {
             self.notes[fieldId] = textarea.value;
         }
@@ -201,7 +203,37 @@ RouteManager.prototype.addMarker = function(fieldId, location, address) {
         draggable: true
     });
 
-    this.markers.push({ id: fieldId, marker: marker });
+    // NOVO: Criar InfoWindow com observação (se existir)
+    var self = this;
+    var infoWindow = new google.maps.InfoWindow();
+    
+    marker.addListener('mouseover', function() {
+        var note = self.notes[fieldId];
+        if (note && note.trim()) {
+            var content = 
+                '<div style="padding:8px;max-width:250px;">' +
+                    '<div style="font-weight:600;margin-bottom:6px;color:#333;font-size:13px;">' + 
+                        '<i class="fas fa-sticky-note" style="color:#ff9800;margin-right:6px;"></i>' +
+                        'Observação' +
+                    '</div>' +
+                    '<div style="color:#666;font-size:12px;line-height:1.5;">' + 
+                        self.escapeHtml(note) +
+                    '</div>' +
+                '</div>';
+            infoWindow.setContent(content);
+            infoWindow.open(self.map, marker);
+        }
+    });
+    
+    marker.addListener('mouseout', function() {
+        infoWindow.close();
+    });
+
+    this.markers.push({ 
+        id: fieldId, 
+        marker: marker,
+        infoWindow: infoWindow 
+    });
 };
 
 RouteManager.prototype.handleMapClick = function(event) {
@@ -660,6 +692,10 @@ RouteManager.prototype.showDetails = function(id) {
     document.getElementById('modalOpenGoogleMaps').onclick = function() {
         self.openSaved(id);
     };
+
+     document.getElementById('modalShareWhatsApp').onclick = function() {
+        self.shareWhatsApp(id);
+    };
     
     document.getElementById('routeDetailsModal').style.display = 'block';
 };
@@ -754,6 +790,233 @@ RouteManager.prototype.deleteRoute = function(id) {
     localStorage.setItem('favoriteRoutes', JSON.stringify(filtered));
     this.loadFavorites();
     alert('Rota excluída!');
+};
+
+RouteManager.prototype.showToast = function(message, type, title) {
+    
+    var icons = {
+        success: '✓',
+        error: '✕',
+        warning: '⚠',
+        info: 'ℹ'
+    };
+    
+    var titles = {
+    };
+    
+    var container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    
+    var toast = document.createElement('div');
+    toast.className = 'toast ' + type;
+    toast.innerHTML = 
+        '<div class="toast-icon">' + icons[type] + '</div>' +
+        '<div class="toast-content">' +
+            '<div class="toast-title">' + titles[type] + '</div>' +
+            '<div class="toast-message">' + message + '</div>' +
+        '</div>' +
+        '<button class="toast-close" onclick="this.parentElement.remove()">×</button>';
+    
+    container.appendChild(toast);
+    
+    setTimeout(function() {
+        toast.classList.add('removing');
+        setTimeout(function() {
+            if (toast.parentElement) {
+                toast.remove();
+            }
+        }, 300);
+    }, 4000);
+};
+
+RouteManager.prototype.updateMarkerTooltip = function(fieldId) {
+    for (var i = 0; i < this.markers.length; i++) {
+        if (this.markers[i].id === fieldId) {
+            var marker = this.markers[i].marker;
+            var note = this.notes[fieldId];
+            
+            // Atualizar o title do marcador
+            if (note && note.trim()) {
+                marker.setTitle(marker.getTitle().split('\n')[0] + '\n📝 ' + note);
+            }
+            break;
+        }
+    }
+};
+
+RouteManager.prototype.shareWhatsApp = function(routeId) {
+    var storedFavorites = localStorage.getItem('favoriteRoutes');
+    var favoritesList = storedFavorites ? JSON.parse(storedFavorites) : [];
+    
+    var route = null;
+    for (var i = 0; i < favoritesList.length; i++) {
+        if (favoritesList[i].id === routeId) {
+            route = favoritesList[i];
+            break;
+        }
+    }
+    
+    if (!route) {
+        this.showToast('Rota não encontrada', 'error');
+        return;
+    }
+    
+    var message = '*🗺️ ' + route.name + '*\n\n';
+    
+    message += '*📍 Origem:*\n' + route.origin.address;
+    if (route.origin.note) {
+        message += '\n_📝 ' + route.origin.note + '_';
+    }
+    message += '\n\n';
+    
+    if (route.waypoints.length > 0) {
+        message += '*🛑 Paradas:*\n';
+        for (var i = 0; i < route.waypoints.length; i++) {
+            message += (i + 1) + '. ' + route.waypoints[i].address;
+            if (route.waypoints[i].note) {
+                message += '\n   _📝 ' + route.waypoints[i].note + '_';
+            }
+            message += '\n';
+        }
+        message += '\n';
+    }
+    
+    message += '*🏁 Destino:*\n' + route.destination.address;
+    if (route.destination.note) {
+        message += '\n_📝 ' + route.destination.note + '_';
+    }
+    message += '\n\n';
+    
+    message += '*📊 Resumo:*\n';
+    message += '• Distância: ' + route.summary.distanceText + '\n';
+    message += '• Tempo estimado: ' + route.summary.durationText + '\n\n';
+    
+    var mapsUrl = this.generateURL(route);
+    if (mapsUrl) {
+        message += '*🔗 Ver no Google Maps:*\n' + mapsUrl;
+    }
+    
+    var whatsappUrl = 'https://wa.me/?text=' + encodeURIComponent(message);
+    window.open(whatsappUrl, '_blank');
+    
+    this.showToast('Abrindo WhatsApp...', 'success');
+};
+
+RouteManager.prototype.initFilters = function() {
+    var self = this;
+    
+    var searchInput = document.getElementById('searchRoutes');
+    var sortSelect = document.getElementById('sortRoutes');
+    
+    if (searchInput) {
+        searchInput.oninput = function() {
+            self.filterAndSortRoutes();
+        };
+    }
+    
+    if (sortSelect) {
+        sortSelect.onchange = function() {
+            self.filterAndSortRoutes();
+        };
+    }
+};
+
+RouteManager.prototype.filterAndSortRoutes = function() {
+    var searchTerm = document.getElementById('searchRoutes').value.toLowerCase();
+    var sortBy = document.getElementById('sortRoutes').value;
+    
+    var storedFavorites = localStorage.getItem('favoriteRoutes');
+    var favoritesList = storedFavorites ? JSON.parse(storedFavorites) : [];
+    
+    // Filtrar
+    var filtered = favoritesList.filter(function(route) {
+        if (!searchTerm) return true;
+        
+        var nameMatch = route.name.toLowerCase().includes(searchTerm);
+        var originMatch = route.origin.address.toLowerCase().includes(searchTerm);
+        var destMatch = route.destination.address.toLowerCase().includes(searchTerm);
+        
+        var waypointMatch = false;
+        for (var i = 0; i < route.waypoints.length; i++) {
+            if (route.waypoints[i].address.toLowerCase().includes(searchTerm)) {
+                waypointMatch = true;
+                break;
+            }
+        }
+        
+    });
+    
+    // Ordenar
+    filtered.sort(function(a, b) {
+        switch(sortBy) {
+            case 'date-desc':
+                return b.id - a.id;
+            case 'date-asc':
+                return a.id - b.id;
+            case 'name-asc':
+                return a.name.localeCompare(b.name);
+            case 'name-desc':
+                return b.name.localeCompare(a.name);
+            case 'distance-asc':
+                var distA = parseFloat(a.summary.distanceText);
+                var distB = parseFloat(b.summary.distanceText);
+                return distA - distB;
+            case 'distance-desc':
+                var distA = parseFloat(a.summary.distanceText);
+                var distB = parseFloat(b.summary.distanceText);
+                return distB - distA;
+            default:
+                return 0;
+        }
+    });
+    
+    this.displayFilteredRoutes(filtered);
+};
+
+RouteManager.prototype.displayFilteredRoutes = function(routes) {
+    var list = document.getElementById('favoritesList');
+    list.innerHTML = '';
+    
+    if (routes.length === 0) {
+        var searchTerm = document.getElementById('searchRoutes').value;
+        if (searchTerm) {
+            list.innerHTML = '<p style="text-align:center;color:#999;padding:1rem">Nenhuma rota encontrada para "' + this.escapeHtml(searchTerm) + '"</p>';
+        } else {
+            list.innerHTML = '<p style="text-align:center;color:#999;padding:1rem">Nenhuma rota salva</p>';
+        }
+        return;
+    }
+    
+    for (var i = 0; i < routes.length; i++) {
+        var r = routes[i];
+        var div = document.createElement('div');
+        div.className = 'favorite-item';
+        div.innerHTML = 
+            '<div class="favorite-header">' +
+            '<div class="favorite-name">' + this.escapeHtml(r.name) + '</div>' +
+            '<div class="favorite-date">' + r.savedAt + '</div>' +
+            '</div>' +
+            '<div class="favorite-info">' +
+            '<span><i class="fas fa-road"></i> ' + r.summary.distanceText + '</span>' +
+            '<span><i class="fas fa-clock"></i> ' + r.summary.durationText + '</span>' +
+            '</div>' +
+            '<div class="favorite-actions">' +
+            '<button class="favorite-btn load" onclick="routeManager.loadRoute(' + r.id + ')"><i class="fas fa-play"></i> Carregar</button>' +
+            '<button class="favorite-btn google" onclick="routeManager.openSaved(' + r.id + ')"><i class="fab fa-google"></i> Maps</button>' +
+            '<button class="favorite-btn info" onclick="routeManager.showDetails(' + r.id + ')"><i class="fas fa-info-circle"></i> Info</button>' +
+            '<button class="favorite-btn delete" onclick="routeManager.deleteRoute(' + r.id + ')"><i class="fas fa-trash"></i></button>' +
+            '</div>';
+        list.appendChild(div);
+    }
+};
+
+RouteManager.prototype.loadFavorites = function() {
+    this.filterAndSortRoutes();
 };
 
 function initMap() {
