@@ -21,7 +21,12 @@ RouteManager.prototype.initMap = function() {
     this.directionsService = new google.maps.DirectionsService();
     this.directionsRenderer = new google.maps.DirectionsRenderer({
         draggable: true,
-        suppressMarkers: true
+        suppressMarkers: true,
+        polylineOptions: {
+            strokeColor: '#2196F3',
+            strokeWeight: 5,
+            strokeOpacity: 0.7
+        }
     });
     this.directionsRenderer.setMap(this.map);
     this.geocoder = new google.maps.Geocoder();
@@ -140,12 +145,19 @@ RouteManager.prototype.setupAutocomplete = function(inputId) {
         var place = autocomplete.getPlace();
         if (place.geometry) {
             self.addMarker(inputId, place.geometry.location, place.formatted_address);
+            self.map.panTo(place.geometry.location);  // ✅ Centralizar mapa
         }
     });
 
+    // ✅ NOVO: Atualizar marcador ao digitar manualmente
+    var timeout = null;
     input.oninput = function() {
+        clearTimeout(timeout);
+        
         if (input.value.trim()) {
-            self.geocodeAddress(input.value, inputId);
+            timeout = setTimeout(function() {
+                self.geocodeAddress(input.value, inputId);
+            }, 1000);  // Aguardar 1s após parar de digitar
         }
     };
 };
@@ -160,9 +172,13 @@ RouteManager.prototype.geocodeAddress = function(address, fieldId) {
 };
 
 RouteManager.prototype.addMarker = function(fieldId, location, address) {
+    // Remove marcador existente se houver
     for (var i = 0; i < this.markers.length; i++) {
         if (this.markers[i].id === fieldId) {
             this.markers[i].marker.setMap(null);
+            if (this.markers[i].infoWindow) {
+                this.markers[i].infoWindow.close();
+            }
             this.markers.splice(i, 1);
             break;
         }
@@ -203,10 +219,10 @@ RouteManager.prototype.addMarker = function(fieldId, location, address) {
         draggable: true
     });
 
-    // NOVO: Criar InfoWindow com observação (se existir)
     var self = this;
     var infoWindow = new google.maps.InfoWindow();
     
+    // NOVO: Listener para mouseover (mostra tooltip)
     marker.addListener('mouseover', function() {
         var note = self.notes[fieldId];
         if (note && note.trim()) {
@@ -229,11 +245,93 @@ RouteManager.prototype.addMarker = function(fieldId, location, address) {
         infoWindow.close();
     });
 
+    // ✅ NOVO: Listener para dragstart (mostra que está arrastando)
+    marker.addListener('dragstart', function() {
+        infoWindow.close();
+        self.showToast('Arraste o marcador para a nova posição', 'info', 'Editando');
+    });
+
+    // ✅ NOVO: Listener para dragend (atualiza endereço)
+    marker.addListener('dragend', function(event) {
+        var newPosition = {
+            lat: event.latLng.lat(),
+            lng: event.latLng.lng()
+        };
+        
+        self.showToast('Atualizando endereço...', 'info', 'Processando');
+        
+        // Reverse Geocoding para obter endereço da nova posição
+        self.geocoder.geocode({ location: newPosition }, function(results, status) {
+            if (status === 'OK' && results[0]) {
+                var newAddress = results[0].formatted_address;
+                
+                // Atualizar input correspondente
+                self.updateInputFromMarker(fieldId, newAddress, newPosition);
+
+                // ✅ OPCIONAL: Recalcular automaticamente se já existe rota
+                if (self.currentRouteData) {
+                    setTimeout(function() {
+                        self.autoRecalculateRoute();
+                    }, 500);
+                } else {
+                    self.showToast('Endereço atualizado! Clique em "Calcular Rota".', 'success');
+                }
+                
+            } else {
+                self.showToast('Erro ao obter endereço. Tente novamente.', 'error', 'Erro');
+                console.error('Geocode error:', status);
+            }
+        });
+    });
+
     this.markers.push({ 
         id: fieldId, 
         marker: marker,
         infoWindow: infoWindow 
     });
+};
+
+RouteManager.prototype.autoRecalculateRoute = function() {
+    var origin = document.getElementById('origin').value;
+    var dest = document.getElementById('destination').value;
+    
+    if (origin.trim() && dest.trim()) {
+        this.showToast('Recalculando rota automaticamente...', 'info', 'Atualizando');
+        this.calculateRoute();
+    }
+};
+
+RouteManager.prototype.updateInputFromMarker = function(fieldId, address, position) {
+    var input = null;
+    
+    // Identificar qual input atualizar
+    if (fieldId === 'origin') {
+        input = document.getElementById('origin');
+    } else if (fieldId === 'destination') {
+        input = document.getElementById('destination');
+    } else {
+        // É um waypoint
+        var inputs = document.querySelectorAll('#waypoints-list .waypoint-input');
+        for (var i = 0; i < inputs.length; i++) {
+            if (inputs[i].dataset.fieldId === fieldId) {
+                input = inputs[i];
+                break;
+            }
+        }
+    }
+    
+    // Atualizar input se encontrado
+    if (input) {
+        input.value = address;
+        
+        // Adicionar efeito visual para mostrar que foi atualizado
+        input.style.background = '#e8f5e9';
+        setTimeout(function() {
+            input.style.background = '';
+        }, 1000);
+        
+        console.log('Input atualizado:', fieldId, address);
+    }
 };
 
 RouteManager.prototype.handleMapClick = function(event) {
@@ -360,7 +458,7 @@ RouteManager.prototype.calculateRoute = function() {
     var dest = document.getElementById('destination').value;
     
     if (!origin.trim() || !dest.trim()) {
-        alert('Preencha origem e destino');
+        this.showToast('Preencha origem e destino', 'warning', 'Atenção');
         return;
     }
 
@@ -369,23 +467,46 @@ RouteManager.prototype.calculateRoute = function() {
     
     for (var i = 0; i < inputs.length; i++) {
         if (inputs[i].value.trim()) {
-            waypoints.push({ location: inputs[i].value.trim(), stopover: true });
+            waypoints.push({ 
+                location: inputs[i].value.trim(), 
+                stopover: true 
+            });
         }
     }
 
+    // ✅ NOVO: Validação de consistência
+    var totalPoints = 2 + waypoints.length; // origem + destino + waypoints
+    if (this.markers.length !== totalPoints) {
+        console.warn('Inconsistência detectada: marcadores=' + this.markers.length + ', pontos=' + totalPoints);
+    }
+
+    this.showToast('Calculando rota...', 'info', 'Processando');
+
     var self = this;
-    console.log('Calculating route from', origin, 'to', dest, 'via', waypoints);
     this.directionsService.route({
         origin: origin,
         destination: dest,
         waypoints: waypoints,
-        travelMode: google.maps.TravelMode.DRIVING
+        travelMode: google.maps.TravelMode.DRIVING,
+        optimizeWaypoints: false  // ✅ Manter ordem dos waypoints
     }, function(result, status) {
         if (status === 'OK') {
             self.directionsRenderer.setDirections(result);
             self.processRoute(result, origin, dest, waypoints);
+            self.showToast('Rota calculada com sucesso!', 'success');
         } else {
-            alert('Erro ao calcular rota: ' + status);
+            var errorMessages = {
+                'ZERO_RESULTS': 'Nenhuma rota encontrada entre estes pontos',
+                'NOT_FOUND': 'Um ou mais endereços não foram encontrados',
+                'MAX_WAYPOINTS_EXCEEDED': 'Máximo de 25 paradas intermediárias',
+                'INVALID_REQUEST': 'Requisição inválida. Verifique os endereços',
+                'OVER_QUERY_LIMIT': 'Limite de consultas excedido. Aguarde um momento',
+                'REQUEST_DENIED': 'Requisição negada. Verifique a API Key',
+                'UNKNOWN_ERROR': 'Erro desconhecido. Tente novamente'
+            };
+            
+            self.showToast(message, 'error', 'Erro');
+            console.error('Directions error:', status);
         }
     });
 };

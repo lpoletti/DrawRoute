@@ -952,3 +952,30 @@ input:checked + .slider:before {
 .favorite-info i {
     color: #999;
 }
+
+/* Marcador sendo editado */
+.gm-style .gm-style-iw-c {
+    border-radius: 8px;
+    padding: 12px;
+}
+
+/* Input atualizado por marcador */
+@keyframes inputUpdated {
+    0% { background: #e8f5e9; }
+    100% { background: white; }
+}
+
+.input-updated {
+    animation: inputUpdated 1s ease-in-out;
+}
+
+/* Botão Calcular Rota com destaque */
+#calculateRoute.has-changes {
+    background: #ff9800;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
